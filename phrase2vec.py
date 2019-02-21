@@ -7,6 +7,7 @@ individual words.
 import os.path
 import gensim.models as gs
 import numpy as np
+import gensim.models.keyedvectors as word2vec
 
 # Authorship
 __author__ = "Ben Eisner, Tim Rocktaschel"
@@ -47,9 +48,11 @@ class Phrase2Vec:
             print(str.format('{} not found. Either provide a different path, or download binary from '
                              'https://code.google.com/archive/p/word2vec/ and unzip', w2v_path))
 
-        w2v = gs.Word2Vec.load_word2vec_format(w2v_path, binary=True)
+        #w2v = gs.Word2Vec.load_word2vec_format(w2v_path, binary=True)
+        w2v = word2vec.KeyedVectors.load_word2vec_format(w2v_path, binary=(not w2v_path.lower().endswith('.txt')))
         if e2v_path is not None:
-            e2v = gs.Word2Vec.load_word2vec_format(e2v_path, binary=True)
+            #e2v = gs.Word2Vec.load_word2vec_format(e2v_path, binary=True)
+            e2v = word2vec.KeyedVectors.load_word2vec_format(e2v_path, binary=True)
         else:
             e2v = dict()
         return cls(dim, w2v, e2v)

@@ -47,20 +47,27 @@ def generate_embeddings(ind2phr, kb, embeddings_file, word2vec_file, word2vec_di
 
         pk.dump(phrase_vector_sums, open(embeddings_file, 'wb'))
     else:
-        print('loading embeddings...')
+        print("loading embeddings from %s ..." % embeddings_file)
         phrase_vector_sums = pk.load(open(embeddings_file, 'rb'))
 
     # build the embeddings array, for lookup later
     embeddings_array = np.zeros(shape=[len(ind2phr), 300], dtype=np.float32)
+    need2die = False
     for ind, phr in ind2phr.items():
-        embeddings_array[ind] = phrase_vector_sums[phr]
-
+        if phr not in phrase_vector_sums:
+            #print ("No embeddings for: ", phr)
+            need2die=True
+        else:
+            embeddings_array[ind] = phrase_vector_sums[phr]
+    
+    if need2die: exit(-1)
+    
     return embeddings_array
 
 
 # Read data from a file and inject it into a knowledge base
 def __read_data(filename, base, ind_to_phr, ind_to_emoj, typ):
-    with open(filename, 'r') as f:
+    with open(filename, 'r', encoding="utf-8") as f:
         # build the data line by line
         lines = f.readlines()
         for line in lines:
@@ -157,6 +164,95 @@ def generate_predictions(e2v, dset, phr_embeddings, ind2emoji, threshold):
     return y_pred_labels, y_pred_values, truths, y_true_values
 
 
+def generate_topn_based_predictions(e2v, dset, phr_embeddings, ind2emoji, topN=2, ind2phr=None, out_file=None, threshold=-1):
+    """Calculate whether a set of emoji/phrase pairs are correlated
+
+        This implementation doesn't use TensorFlow, and relies instead of injected vectors
+
+    Args:
+        e2v: Mapping from emoji to vector, typically the trained emoji vectors from our model.
+        dset: KB that contains pairs of emoji and phrases, as well as whether they are correlated.
+        phr_embeddings: Map between phrase indices and phrase vectors, as computed by the vector sum of
+            word vectors for that phrase.
+        ind2emoji: Map between emoji index and emoji, for converting dset indices into emoji.
+        threshold: Threshold for classifying correlation as true or false.
+
+    Returns:
+        y_pred_labels: List of predicted labels for pairs in the dataset
+        y_pred_values: List of predicted scores for pairs in the dataset
+        y_true_labels: List of true labels for pairs in the dataset
+        y_true_values: List of true scores for pairs in the dataset
+
+    """
+    y_pred_labels = list()
+    y_pred_values = list()
+
+    fp = open(out_file, "w", encoding='utf-8') if out_file else None
+
+    phr_ixs, em_ixs, truths = dset
+
+    __np =  0
+    __nn =  0
+    __tp =  0
+    __fp =  0
+    __fn =  0
+    __tn =  0
+    __tot = 0
+    
+    for (phr_ix, em_ix, truth) in zip(phr_ixs, em_ixs, truths):
+
+        scores = list()
+        for em_itn_idx in ind2emoji.keys():
+            prob = __sigmoid(
+                np.dot(matutils.unitvec(phr_embeddings[phr_ix]), matutils.unitvec(e2v[ind2emoji[em_itn_idx]])))
+            scores.append({'idx':em_itn_idx, 'prob': prob})
+            if em_itn_idx == em_ix:
+                y_pred_values.append(prob)
+
+        scores.sort(key=lambda elem: elem['prob'], reverse=True)
+        
+        hyp_labels = dict()
+        hypstr = ''
+        for i in range(topN):
+            prob = scores[i]['prob']
+            hyp_em_idx = scores[i]['idx']
+            if threshold is not None and prob < threshold:
+                break
+            hyp_labels[hyp_em_idx] = prob
+            if hypstr != '':
+                hypstr += "\t"
+            hypstr += '{}:{:.2}'.format(ind2emoji[hyp_em_idx], prob)
+
+        hypothesis = (em_ix in hyp_labels)
+        y_pred_labels.append(hypothesis)
+
+        if fp is not None:
+            fp.write(str.format('{}\t{}\t{} {}\t{}\n', ind2phr[phr_ix], ind2emoji[em_ix], truth, hypothesis, hypstr))
+
+        __tot += 1
+        if truth == True:
+            __np += 1
+            if hypothesis == truth:
+                __tp += 1
+            else:
+                __fn += 1
+        else:
+            __nn += 1
+            if hypothesis == truth:
+                __tn += 1
+            else:
+                __fp += 1
+
+
+    rec = {'tot': __tot, 'np': __np, 'nn': __nn, 'tp': __tp, 'tn': __tn, 'fp': __fp, 'fn': __fn}
+    y_true_values = [float(v) for v in truths]
+    if fp is not None:
+        fp.close()
+
+    return y_pred_labels, y_pred_values, truths, y_true_values, rec
+
+
+
 def get_metrics(pred_labels, pred_values, truth_labels, truth_values):
     """Get a set of metrics, including accuracy, f1 score, and area under the curve.
 
@@ -179,3 +275,4 @@ def get_metrics(pred_labels, pred_values, truth_labels, truth_values):
         auc = 'N/A'
 
     return acc, f1, auc
+

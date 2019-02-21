@@ -39,6 +39,10 @@ class CliParser:
         self.parser.add_argument('-t', '--threshold', default=0.5, type=float,
                                  help='threshold for binary classification')
 
+        self.parser.add_argument('-n', '--topn', default=2, type=int,
+                                 help='binary classification based on top-N hypothesis')
+        
+        
         # Miscellaneous
         self.parser.add_argument('-ds', '--dataset', default='unicode', type=str, help='unicode or emojipedia')
         self.parser.add_argument('-D', '--debug', help='enable debugging')
@@ -67,6 +71,9 @@ class CliParser:
 
         # dataset to chose: unicode or emojipedia
         self.dataset = args.dataset
+
+        #top-N for scoring
+        self.topn = args.topn
 
     def print_params(self, title):
         """Pretty-print the parameters

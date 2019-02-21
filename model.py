@@ -10,6 +10,7 @@ import tensorflow as tf
 import numpy as np
 import sklearn.metrics as metrics
 import gensim.models as gs
+import gensim.models.keyedvectors as word2vec
 
 from naga.shared.kb import BatchNegSampler
 from naga.shared.trainer import Trainer
@@ -80,6 +81,8 @@ class Emoji2Vec:
         self.num_cols = num_emoji
         self.embeddings_array = embeddings_array
 
+        tf.set_random_seed(123456789)
+
         # If we are trying to learn the emoji in the same space as the words, we don't need a projection matrix
         # also saves some training time
         is_proj = not (model_params.in_dim == model_params.out_dim)
@@ -119,13 +122,13 @@ class Emoji2Vec:
         v_col = tf.nn.dropout(v_col, (1 - model_params.dropout))
 
         # Calculate the predicted score, a.k.a. dot product (here)
-        self.score = tf.reduce_sum(tf.mul(v_row, v_col), 1)
+        self.score = tf.reduce_sum(tf.multiply(v_row, v_col), 1)
 
         # Probability of match
         self.prob = tf.sigmoid(self.score)
 
         # Calculate the cross-entropy loss
-        self.loss = tf.nn.sigmoid_cross_entropy_with_logits(self.score, self.y)
+        self.loss = tf.nn.sigmoid_cross_entropy_with_logits(logits=self.score, labels=self.y)
 
     # train the model using the appropriate parameters
     def train(self, kb, hooks, session):
@@ -250,7 +253,7 @@ class Emoji2Vec:
         vecs = sess.run(self.V)
         txt_path = model_folder + '/emoji2vec.txt'
         bin_path = model_folder + '/emoji2vec.bin'
-        f = open(txt_path, 'w')
+        f = open(txt_path, 'w', encoding='utf-8')
         f.write('%d %d\n' % (len(vecs), out_dim))
         for i in range(len(vecs)):
             f.write(ind2emoj[i] + ' ')
@@ -259,7 +262,8 @@ class Emoji2Vec:
             f.write('\n')
         f.close()
 
-        e2v = gs.Word2Vec.load_word2vec_format(txt_path, binary=False)
+        #e2v = gs.Word2Vec.load_word2vec_format(txt_path, binary=False)
+        e2v = word2vec.KeyedVectors.load_word2vec_format(txt_path, binary=False)
         e2v.save_word2vec_format(bin_path, binary=True)
 
         return e2v

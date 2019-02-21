@@ -32,16 +32,16 @@ __email__ = "beisner@princeton.edu"
 # The grid search we will perform will iterate through all permutations of these parameters
 search_params = {
     "out_dim": [300],
-    "pos_ex": [4, 16, 64],
-    "max_epochs": [10, 20],
+    "pos_ex": [2, 4, 8],
+    "max_epochs": [5, 10, 20, 40],
     "ratio": [0, 1, 2],
     "dropout": [0.0, 0.1]
 }
 
 
 # Recursive Grid Search
-def __grid_search(remaining_params, current_params, results_dict, train_set, dev_set, kb, embeddings_array, ind2emoji,
-                  dataset_name, in_dim, learning_rate, threshold):
+def __grid_search(remaining_params, current_params, results_dict, train_set, dev_set, kb, embeddings_array, ind2emoji, ind2phr,
+                  dataset_name, in_dim, learning_rate, threshold, topN):
     if len(remaining_params) > 0:
         # Get a parameter
         param, values = remaining_params.popitem()
@@ -54,8 +54,8 @@ def __grid_search(remaining_params, current_params, results_dict, train_set, dev
             # Perform grid search on the remaining params
             __grid_search(remaining_params=remaining_params.copy(), current_params=next_params,
                           results_dict=results_dict, train_set=train_set, dev_set=dev_set, kb=kb,
-                          embeddings_array=embeddings_array, ind2emoji=ind2emoji, dataset_name=dataset_name,
-                          in_dim=in_dim, learning_rate=learning_rate, threshold=threshold)
+                          embeddings_array=embeddings_array, ind2emoji=ind2emoji, ind2phr=ind2phr, dataset_name=dataset_name,
+                          in_dim=in_dim, learning_rate=learning_rate, threshold=threshold, topN=topN)
     else:
         model_params = ModelParams(in_dim=in_dim, out_dim=current_params["out_dim"],
                                    max_epochs=current_params["max_epochs"], pos_ex=current_params["pos_ex"],
@@ -70,12 +70,12 @@ def __grid_search(remaining_params, current_params, results_dict, train_set, dev
 
         results_dict[name] = train_save_evaluate(params=model_params, train_set=train_set, dev_set=dev_set,
                                                  kb=kb, embeddings_array=embeddings_array, ind2emoji=ind2emoji,
-                                                 dataset_name=dataset_name)
+                                                 dataset_name=dataset_name, topN=topN, ind2phr=ind2phr)
 
     return results_dict
 
 
-def grid_search(params, learning_rate, threshold, in_dim, kb, embeddings_array, ind2emoji, dataset_name):
+def grid_search(params, learning_rate, threshold, in_dim, kb, embeddings_array, ind2emoji, dataset_name, topN=2, ind2phr=None):
     """Perform a grid search on the search parameter space provided py params
 
     Args:
@@ -105,8 +105,8 @@ def grid_search(params, learning_rate, threshold, in_dim, kb, embeddings_array, 
     # Perform the recursive grid search
     return __grid_search(remaining_params=params, current_params=dict(), results_dict=results_dict,
                          train_set=train_set, dev_set=dev_set, kb=kb, embeddings_array=embeddings_array,
-                         ind2emoji=ind2emoji, dataset_name=dataset_name, in_dim=in_dim, learning_rate=learning_rate,
-                         threshold=threshold)
+                         ind2emoji=ind2emoji, ind2phr=ind2phr, dataset_name=dataset_name, in_dim=in_dim, learning_rate=learning_rate,
+                         threshold=threshold, topN=topN)
 
 
 # Run grid search, only for standalone execution
@@ -126,15 +126,17 @@ def __run_grid_search():
     print('performing grid search')
     results_dict = grid_search(params=search_params, learning_rate=args.model_params.learning_rate,
                                threshold=args.model_params.class_threshold, in_dim=args.model_params.in_dim, kb=kb,
-                               embeddings_array=embeddings_array, ind2emoji=ind2emoji, dataset_name=args.dataset)
+                               embeddings_array=embeddings_array, ind2emoji=ind2emoji, dataset_name=args.dataset, topN=args.topn, ind2phr=ind2phr)
 
     # Get top 5 results
-    results = sorted(results_dict, key=(lambda x: results_dict[x]['auc']), reverse=True)
+    #results = sorted(results_dict, key=(lambda x: results_dict[x]['auc']), reverse=True)
+    results = sorted(results_dict, key=(lambda x: results_dict[x]['topn']), reverse=True)
     for result in results[:5]:
         print(str.format('{}\n{}', result, results_dict[result]))
 
     m = results_dict[results[0]]
-    print(str.format("The best combination, by auc score, is: {} at {}", results[0], m))
+    #print(str.format("The best combination, by auc score, is: {} at {}", results[0], m))
+    print(str.format("The best combination, by topN accuracy score, is: {} at {}", results[0], m))
 
 
 if __name__ == '__main__':

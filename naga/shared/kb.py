@@ -12,6 +12,8 @@ DEV_LABEL = "dev"
 TEST_LABEL = "test"
 TMP_LABEL = "tmp"
 
+random.seed(123456789)
+np.random.seed(123456789)
 
 class KB:
     """
