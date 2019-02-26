@@ -32,10 +32,10 @@ __email__ = "beisner@princeton.edu"
 # The grid search we will perform will iterate through all permutations of these parameters
 search_params = {
     "out_dim": [300],
-    "pos_ex": [2, 4, 8],
+    "pos_ex": [2, 4, 8, 16],
     "max_epochs": [5, 10, 20, 40],
-    "ratio": [0, 1, 2],
-    "dropout": [0.0, 0.1]
+    "ratio": [0, 1, 2, 4],
+    "dropout": [0.0, 0.01, 0.1]
 }
 
 

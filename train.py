@@ -20,6 +20,8 @@ from model import Emoji2Vec
 from parameter_parser import CliParser
 from utils import build_kb, get_examples_from_kb, generate_embeddings, get_metrics, generate_predictions, generate_topn_based_predictions
 
+import multiprocessing
+
 from sklearn import metrics
 import json
 
@@ -208,4 +210,7 @@ def train_save_evaluate(params, kb, train_set, dev_set, ind2emoji, embeddings_ar
 
 
 if __name__ == '__main__':
+
+    multiprocessing.set_start_method('forkserver', force=True)
+    multiprocessing.freeze_support()
     __run_training()
